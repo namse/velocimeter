@@ -5,7 +5,6 @@ const horse = document.getElementById('horse');
 let frameIndex = 0;
 const MAX_FRAME_INDEX = 4;
 
-
 function updateVelocity(newVelocity) {
   velocity = newVelocity;
   updateInterval();
