@@ -16,17 +16,13 @@ const VELOCIMITER_ID = '10CC61C6-C670-4748-86E5-145ADF83AA82';
 const CSC_MEASUREMENT_CHARACTERISTIC = '2A5B';
 const CSC_SERVICE = '1816';
 
-
-
 export default class App2 extends Component {
   constructor(props) {
     super(props);
 
     this.state = {
-      cumulativeWheelRevolutions: 0,
-      lastWheelEventTime: 0,
-      cumulativeCrankRevolutions: 0,
-      lastCrankEventTime: 0,
+      velocity: 0,
+      cadence: 0,
     };
   }
   componentDidMount() {
@@ -53,79 +49,28 @@ export default class App2 extends Component {
         console.log(characteristic);
         return;
       }
-      const flags = value[0];
-      const isWheel = flags & 1 !== 0;
-      const isCrank = flags & 2 !== 0;
-
-      const cumulativeWheelRevolutions = !isWheel
-      ? 0
-      : (value[1]
-        + value[2] * 256
-        + value[3] * 256 * 256
-        + value[4] * 256 * 256);
-
-      const lastWheelEventTime = !isWheel
-      ? 0
-      : (value[5]
-        + value[6] * 256);
-
-      let cumulativeCrankRevolutions;
-      let lastCrankEventTime;
-      if (!isCrank) {
-        cumulativeCrankRevolutions = 0;
-        lastCrankEventTime = 0;
-      } else {
-        if (isWheel) {
-          cumulativeCrankRevolutions = (value[7]
-            + value[8] * 256);
-
-          lastCrankEventTime = (value[9]
-            + value[10] * 256);
-        } else {
-          cumulativeCrankRevolutions = (value[1]
-            + value[2] * 256);
-
-          lastCrankEventTime = (value[3]
-            + value[4] * 256);
-        }
-      }
-
-
+      const {
+        cadence,
+        velocity,
+      } = calculate(value);
       this.setState({
-        cumulativeWheelRevolutions,
-        lastWheelEventTime,
-        cumulativeCrankRevolutions,
-        lastCrankEventTime,
+        cadence,
+        velocity,
       });
     });
   }
   render() {
     const {
-      cumulativeWheelRevolutions,
-      lastWheelEventTime,
-      cumulativeCrankRevolutions,
-      lastCrankEventTime,
+      cadence,
+      velocity,
     } = this.state;
     return (
       <View style={styles.container}>
         <Text style={styles.welcome}>
-          cumulativeWheelRevolutions: {cumulativeWheelRevolutions}
+          cadence: {cadence}
         </Text>
         <Text style={styles.welcome}>
-          lastWheelEventTime: {lastWheelEventTime}
-        </Text>
-        <Text style={styles.welcome}>
-          cumulativeCrankRevolutions: {cumulativeCrankRevolutions}
-        </Text>
-        <Text style={styles.welcome}>
-          lastCrankEventTime: {lastCrankEventTime}
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit index.ios.js
-        </Text>
-        <Text style={styles.instructions}>
-          Press Cmd+R to reload,{'\n'}
-          Cmd+D or shake for dev menu
+          velocity: {velocity}
         </Text>
       </View>
     );

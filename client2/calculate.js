@@ -3,7 +3,7 @@ let currentWheelRevolutions;
 let previousWheelEvent;
 let currentWheelEvent;
 
-let lastSpeed = 0;
+let lastVelocity = 0;
 let lastWheelEvent;
 let lastWheelRounds;
 let exercisedWheelRevolutions;
@@ -16,9 +16,10 @@ let currentCrankEvent;
 let lastCadence = 0;
 let lastCrankEvent;
 
-const MIN_SPEED_VALUE = 2.5;
+const MIN_VELOCITY_VALUE = 2.5;
+const MAX_CEVENT_TIME = 4;
 const WHEEL_SIZE = 700;
-const MAX_WHEEL_TIME = Math.floor(((WHEEL_SIZE * 0.001 * 3.6) / MIN_SPEED_VALUE));
+const MAX_WHEEL_TIME = Math.floor(((WHEEL_SIZE * 0.001 * 3.6) / MIN_VELOCITY_VALUE));
 const WHEEL_SIZE_METER = WHEEL_SIZE / 1000;
 
 export default function calculate(value) {
@@ -27,7 +28,6 @@ export default function calculate(value) {
   const isCrank = flags & 2 !== 0;
 
   const absoluteTime = new Date();
-
   if (isWheel) {
     previousWheelRevolutions = currentWheelRevolutions;
 
@@ -40,8 +40,7 @@ export default function calculate(value) {
 
     currentWheelEvent = (value[5] + value[6] * 256) / 1024.0;
 
-    if (!lastSpeed) {
-      lastSpeed = 0;
+    if (!lastWheelEvent) {
       lastWheelEvent = absoluteTime;
     } else {
       const eventDiff = currentWheelEvent;
@@ -65,20 +64,20 @@ export default function calculate(value) {
       }
 
       exercisedWheelRevolutions += wheelRounds;
-      let speed = 0;
+      let velocity = 0;
 
       if ((!eventDiff || !wheelRounds)
         && (absoluteTime - lastWheelEvent) < MAX_WHEEL_TIME ) {
-        speed = lastSpeed;
+        velocity = lastVelocity;
         exercisedWheelRevolutions += lastWheelRounds;
       }
 
       if (eventDiff && wheelRounds) {
-        speed = ((WHEEL_SIZE_METER * wheelRounds) / eventDiff) * 3.6;
+        velocity = ((WHEEL_SIZE_METER * wheelRounds) / eventDiff) * 3.6;
         lastWheelEvent = absoluteTime;
       }
 
-      lastSpeed = speed;
+      lastVelocity = velocity;
       const distance = WHEEL_SIZE_METER * exercisedWheelRevolutions; // in meters
       const totalDistance = WHEEL_SIZE * currentWheelRevolutions; // in meters, assumption that the wheel size has been the same
     }
@@ -102,10 +101,9 @@ export default function calculate(value) {
       crankRounds = currentCrankRevolutions - previousCrankRevolutions;
     }
 
-    if (!lastCadence) {
+    if (!lastCrankEvent) {
       // skip first packet
       lastCrankEvent = absoluteTime;
-      lastCadence = 0;
     } else {
       const eventDiff = currentCrankEvent;
 
@@ -131,6 +129,6 @@ export default function calculate(value) {
   }
   return {
     cadence: lastCadence,
-    speed: lastSpeed
+    velocity: lastVelocity
   }
 }
