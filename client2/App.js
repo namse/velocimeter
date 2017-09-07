@@ -4,199 +4,131 @@ import {
   StyleSheet,
   Text,
   View,
-  TouchableHighlight,
-  NativeAppEventEmitter,
-  NativeEventEmitter,
   NativeModules,
-  Platform,
-  PermissionsAndroid,
-  ListView,
-  ScrollView
+  NativeEventEmitter,
 } from 'react-native';
-import Dimensions from 'Dimensions';
 import BleManager from 'react-native-ble-manager';
-import TimerMixin from 'react-timer-mixin';
-import reactMixin from 'react-mixin';
-
-const window = Dimensions.get('window');
-const ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
+import io from 'socket.io-client';
+import calculate from './calculate';
 
 const BleManagerModule = NativeModules.BleManager;
 const bleManagerEmitter = new NativeEventEmitter(BleManagerModule);
+const VELOCIMITER_ID = '10CC61C6-C670-4748-86E5-145ADF83AA82';
+const CSC_MEASUREMENT_CHARACTERISTIC = '2A5B';
+const CSC_SERVICE = '1816';
+const serverURL = 'http://ec2-13-124-203-7.ap-northeast-2.compute.amazonaws.com:3000';
 
-export default class App extends Component {
-  constructor(){
-    super()
+export default class App2 extends Component {
+  constructor(props) {
+    super(props);
 
     this.state = {
-      scanning:false,
-      peripherals: new Map()
-    }
-
-    this.handleDiscoverPeripheral = this.handleDiscoverPeripheral.bind(this);
-    this.handleStopScan = this.handleStopScan.bind(this);
-    this.handleUpdateValueForCharacteristic = this.handleUpdateValueForCharacteristic.bind(this);
-    this.handleDisconnectedPeripheral = this.handleDisconnectedPeripheral.bind(this);
+      velocity: 0,
+      cadence: 0,
+      isSocketConnected: false,
+    };
   }
-
   componentDidMount() {
+    this.initBleManager();
+    this.initSocketIO();
+  }
+  initSocketIO() {
+    const socket = io(serverURL);
+    socket.on('connect', () => {
+      this.setState({
+        isSocketConnected: true,
+      });
+    });
+    socket.on('disconnect', () => {
+      this.setState({
+        isSocketConnected: false,
+      });
+    });
+    this.socket = socket;
+  }
+  onNewData(cadence, velocity) {
+    this.setState({
+      cadence,
+      velocity,
+    });
+    const {
+      isSocketConnected,
+      socket
+    } = this.state;
+    if (isSocketConnected) {
+      this.socket.emit('velocity', velocity);
+      this.socket.emit('cadence', cadence);
+    }
+  }
+  initBleManager() {
     BleManager.start({showAlert: false});
+    BleManager.connect(VELOCIMITER_ID)
+    .then(() => {
+      console.log('connected');
+      return BleManager.retrieveServices(VELOCIMITER_ID);
+    })
+    .then((peripheralData) =>
+      BleManager.startNotification(VELOCIMITER_ID, CSC_SERVICE, CSC_MEASUREMENT_CHARACTERISTIC))
+    .then(() => {
+      console.log('Notification started');
+    })
+    .catch((err) => console.log(err));
 
-    this.handlerDiscover = bleManagerEmitter.addListener('BleManagerDiscoverPeripheral', this.handleDiscoverPeripheral );
-    this.handlerStop = bleManagerEmitter.addListener('BleManagerStopScan', this.handleStopScan );
-    this.handlerDisconnect = bleManagerEmitter.addListener('BleManagerDisconnectPeripheral', this.handleDisconnectedPeripheral );
-    this.handlerUpdate = bleManagerEmitter.addListener('BleManagerDidUpdateValueForCharacteristic', this.handleUpdateValueForCharacteristic );
-
-
-
-    if (Platform.OS === 'android' && Platform.Version >= 23) {
-        PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
-            if (result) {
-              console.log("Permission is OK");
-            } else {
-              PermissionsAndroid.requestPermission(PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION).then((result) => {
-                if (result) {
-                  console.log("User accept");
-                } else {
-                  console.log("User refuse");
-                }
-              });
-            }
-      });
-    }
-  }
-
-  componentWillUnmount() {
-    this.handlerDiscover.remove();
-    this.handlerStop.remove();
-    this.handlerDisconnect.remove();
-    this.handlerUpdate.remove();
-  }
-
-  handleDisconnectedPeripheral(data) {
-    let peripherals = this.state.peripherals;
-    let peripheral = peripherals.get(data.peripheral);
-    if (peripheral) {
-      peripheral.connected = false;
-      peripherals.set(peripheral.id, peripheral);
-      this.setState({peripherals});
-    }
-    console.log('Disconnected from ' + data.peripheral);
-  }
-
-  handleUpdateValueForCharacteristic(data) {
-    console.log('Received data from ' + data.peripheral + ' characteristic ' + data.characteristic, data.value);
-  }
-
-  handleStopScan() {
-    console.log('Scan is stopped');
-    this.setState({ scanning: false });
-  }
-
-  startScan() {
-    if (!this.state.scanning) {
-      BleManager.scan([], 3, true).then((results) => {
-        console.log('Scanning...');
-        this.setState({scanning:true});
-      });
-    }
-  }
-
-  handleDiscoverPeripheral(peripheral){
-    var peripherals = this.state.peripherals;
-    if (!peripherals.has(peripheral.id)){
-      console.log('Got ble peripheral', peripheral);
-      peripherals.set(peripheral.id, peripheral);
-      this.setState({ peripherals })
-    }
-  }
-
-  test(peripheral) {
-    if (peripheral){
-      if (peripheral.connected){
-        BleManager.disconnect(peripheral.id);
-      } else {
-        BleManager.connect(peripheral.id).then(() => {
-          let peripherals = this.state.peripherals;
-          let p = peripherals.get(peripheral.id);
-          if (p) {
-            p.connected = true;
-            peripherals.set(peripheral.id, p);
-            this.setState({ peripherals });
-          }
-          console.log('Connected to ' + peripheral.id);
-
-          BleManager.retrieveServices(peripheral.id).then((peripheralData) => {
-            console.log('Retrieved peripheral services', peripheralData);
-
-            BleManager.readRSSI(peripheral.id).then((rssi) => {
-              console.log('Retrieved actual RSSI value', rssi);
-            });
-          });
-
-          // Specific to test my device
-          BleManager.retrieveServices(peripheral.id).then((peripheralInfo) => {
-            console.log(`peripheralInfo : ${JSON.stringify(peripheralInfo)}`);
-          });
-        })
-        .catch((error) => {
-          console.log('Connection error', error);
-        });
+    bleManagerEmitter.addListener('BleManagerDidUpdateValueForCharacteristic', ({
+      value,
+      peripheral,
+      characteristic,
+    }) => {
+      if (characteristic !== CSC_MEASUREMENT_CHARACTERISTIC) {
+        console.log(characteristic);
+        return;
       }
-    }
+      const {
+        cadence,
+        velocity,
+      } = calculate(value);
+      this.onNewData(cadence, velocity);
+    });
   }
-
   render() {
-    const list = Array.from(this.state.peripherals.values());
-    const dataSource = ds.cloneWithRows(list);
-
-
+    const {
+      cadence,
+      velocity,
+      isSocketConnected,
+    } = this.state;
     return (
       <View style={styles.container}>
-        <TouchableHighlight style={{marginTop: 40,margin: 20, padding:20, backgroundColor:'#ccc'}} onPress={() => this.startScan() }>
-          <Text>Scan Bluetooth ({this.state.scanning ? 'on' : 'off'})</Text>
-        </TouchableHighlight>
-        <ScrollView style={styles.scroll}>
-          {(list.length == 0) &&
-            <View style={{flex:1, margin: 20}}>
-              <Text style={{textAlign: 'center'}}>No peripherals</Text>
-            </View>
-          }
-          <ListView
-            enableEmptySections={true}
-            dataSource={dataSource}
-            renderRow={(item) => {
-              const color = item.connected ? 'green' : '#fff';
-              return (
-                <TouchableHighlight onPress={() => this.test(item) }>
-                  <View style={[styles.row, {backgroundColor: color}]}>
-                    <Text style={{fontSize: 12, textAlign: 'center', color: '#333333', padding: 10}}>{item.name}</Text>
-                    <Text style={{fontSize: 8, textAlign: 'center', color: '#333333', padding: 10}}>{item.id}</Text>
-                  </View>
-                </TouchableHighlight>
-              );
-            }}
-          />
-        </ScrollView>
+        <Text style={styles.welcome}>
+          cadence: {cadence}
+        </Text>
+        <Text style={styles.welcome}>
+          velocity: {velocity}
+        </Text>
+        <Text style={styles.welcome}>
+          isSocketConnected: {JSON.stringify(isSocketConnected)}
+        </Text>
       </View>
     );
   }
 }
-reactMixin(App.prototype, TimerMixin);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
-    width: window.width,
-    height: window.height
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5FCFF',
   },
-  scroll: {
-    flex: 1,
-    backgroundColor: '#f0f0f0',
+  welcome: {
+    fontSize: 20,
+    textAlign: 'center',
     margin: 10,
   },
-  row: {
-    margin: 10
+  instructions: {
+    textAlign: 'center',
+    color: '#333333',
+    marginBottom: 5,
   },
 });
+
+AppRegistry.registerComponent('client', () => client);
