@@ -10,3 +10,16 @@
 .frame-2 { background-position: -128px 0; }
 .frame-3 { background-position: -192px 0; }
 .frame-4 { background-position: -256px 0; }
+
+.window {
+  background-color: black;
+}
+#velocity {
+  color: white;
+  display: block;
+}
+
+#cadence {
+  color: white;
+  display: block;
+}

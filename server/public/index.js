@@ -1,16 +1,21 @@
-let velocity = 0;
 let interval = -1;
 
 const horse = document.getElementById('horse');
+const velocityDiv = document.getElementById('velocity');
+const cadenceDiv = document.getElementById('cadence');
 let frameIndex = 0;
 const MAX_FRAME_INDEX = 4;
 
-function updateVelocity(newVelocity) {
-  velocity = newVelocity;
-  updateInterval();
+function updateVelocity(velocity) {
+  velocityDiv.innerHTML = `${velocity.toFixed(1)} km/h`;
+  updateInterval(velocity);
 }
 
-function updateInterval() {
+function updateCadence(cadence) {
+  cadenceDiv.innerHTML = `${cadence.toFixed(0)} RPM`
+}
+
+function updateInterval(velocity) {
   const previousInterval = interval;
   interval = velocity === 0
     ? -1
