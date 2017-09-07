@@ -12,6 +12,7 @@ server.listen(3000);
 const subscribes = [];
 
 io.on('connection', (socket) => {
+  console.log('connected');
   socket.on('subscribe', () => {
     subscribes.push(socket);
   });
@@ -26,5 +27,8 @@ io.on('connection', (socket) => {
 
   socket.on('velocity', (velocity) => {
     subscribes.forEach(subSocket => subSocket.emit('velocity', velocity));
+  });
+  socket.on('cadence', (cadence) => {
+    subscribes.forEach(subSocket => subSocket.emit('cadence', cadence));
   });
 });
