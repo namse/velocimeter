@@ -31,4 +31,7 @@ io.on('connection', (socket) => {
   socket.on('cadence', (cadence) => {
     subscribes.forEach(subSocket => subSocket.emit('cadence', cadence));
   });
+  socket.on('gps', (data) => {
+    subscribes.forEach(subSocket => subSocket.emit('gps', data));
+  });
 });
